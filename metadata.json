@@ -1,0 +1,5 @@
+{
+  "name": "CashMap",
+  "description": "A comprehensive home finance application featuring envelope budgeting, income allocation logic, transaction tracking with AI auto-categorization, and rollover budgeting.",
+  "requestFramePermissions": []
+}
