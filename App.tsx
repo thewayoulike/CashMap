@@ -17,10 +17,12 @@ declare global {
   }
 }
 
+// Declaration to prevent TypeScript errors during build when using process.env
+declare const process: any;
+
 // --- CONFIGURATION ---
-// IMPORTANT: Replace this with your actual Client ID from Google Cloud Console
-// It should look like: "123456789-abcdefg.apps.googleusercontent.com"
-const CLIENT_ID = "YOUR_CLIENT_ID_HERE.apps.googleusercontent.com"; 
+// Uses the environment variable configured in Vercel/Vite, or falls back to placeholder if missing
+const CLIENT_ID = process.env.CLIENT_ID || "YOUR_CLIENT_ID_HERE.apps.googleusercontent.com"; 
 const SCOPES = "https://www.googleapis.com/auth/drive.file";
 
 const App: React.FC = () => {
