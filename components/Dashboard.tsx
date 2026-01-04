@@ -1457,6 +1457,7 @@ export const Dashboard: React.FC<DashboardProps> = ({ categories, setCategories,
                   </div>
               </div>
           </div>
+      )}
     </div>
   );
 };
