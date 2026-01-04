@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { Transaction, Category, TransactionType } from '../types';
-import { Upload, Plus, Wand2, ArrowDownLeft, ArrowUpRight, CheckCircle2, Loader2, Info, X, TableProperties, Edit2, Columns, SplitSquareHorizontal, Trash2, Coins, AlertTriangle, Check, CornerDownRight, Layers, PlusCircle, MinusCircle, Filter, Search, Calendar } from 'lucide-react';
+import { Upload, Plus, Wand2, ArrowDownLeft, ArrowUpRight, CheckCircle2, Loader2, Info, X, TableProperties, Edit2, Columns, SplitSquareHorizontal, Trash2, Coins, AlertTriangle, Check, CornerDownRight, Layers, PlusCircle, MinusCircle, Filter, Search, Calendar, Key } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
 import { categorizeTransaction, categorizeTransactionsBatch } from '../services/geminiService';
 
@@ -74,6 +74,11 @@ export const Transactions: React.FC<TransactionsProps> = ({ transactions, setTra
   const [bulkProcessing, setBulkProcessing] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editForm, setEditForm] = useState<Partial<Transaction>>({});
+
+  // API Key State
+  const [apiKey, setApiKey] = useState(() => localStorage.getItem('gemini_api_key') || '');
+  const [showKeyModal, setShowKeyModal] = useState(false);
+  const [tempKey, setTempKey] = useState('');
 
   // View State
   const [expandedRows, setExpandedRows] = useState<Set<string>>(new Set());
@@ -340,6 +345,13 @@ export const Transactions: React.FC<TransactionsProps> = ({ transactions, setTra
      }
   };
 
+  const saveApiKey = () => {
+      if (!tempKey.trim()) return;
+      localStorage.setItem('gemini_api_key', tempKey.trim());
+      setApiKey(tempKey.trim());
+      setShowKeyModal(false);
+  };
+
   const openFundModal = (tx: Transaction) => {
       setFundingTx(tx);
       const children = childrenMap.get(tx.id) || [];
@@ -540,19 +552,27 @@ export const Transactions: React.FC<TransactionsProps> = ({ transactions, setTra
   };
 
   const autoCategorizeSingle = async (txId: string, desc: string) => {
+    if (!apiKey) {
+        setShowKeyModal(true);
+        return;
+    }
     setIsProcessing(true);
-    const catId = await categorizeTransaction(desc, categories);
+    const catId = await categorizeTransaction(apiKey, desc, categories);
     setIsProcessing(false);
     if (catId) updateCategory(txId, catId);
     else alert("AI couldn't confidently categorize this. Please select manually.");
   };
 
   const autoCategorizeAll = async () => {
+    if (!apiKey) {
+        setShowKeyModal(true);
+        return;
+    }
     const uncategorized = transactions.filter(t => !t.categoryId && t.type === TransactionType.EXPENSE);
     if (uncategorized.length === 0) return;
     setBulkProcessing(true);
     const uniqueDescs = Array.from(new Set(uncategorized.map(t => t.description))) as string[];
-    const matches = await categorizeTransactionsBatch(uniqueDescs, categories);
+    const matches = await categorizeTransactionsBatch(apiKey, uniqueDescs, categories);
     setTransactions(prev => prev.map(t => {
         if (!t.categoryId && matches[t.description]) {
             return { ...t, categoryId: matches[t.description] };
@@ -594,7 +614,6 @@ export const Transactions: React.FC<TransactionsProps> = ({ transactions, setTra
                   
                   <div className="p-6 overflow-y-auto space-y-8">
                        {/* CSV Import UI Logic Here (Already implemented above) */}
-                       {/* Simplified for brevity in this update block since core logic is unchanged, just wrapped in modal */}
                         <p className="text-sm text-gray-500">
                             Verify your CSV column mapping below. 
                         </p>
@@ -615,7 +634,6 @@ export const Transactions: React.FC<TransactionsProps> = ({ transactions, setTra
       {/* Fund Transaction Modal (Existing) */}
       {showFundModal && fundingTx && (
           <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-fade-in">
-              {/* Existing Funding Modal Content */}
                <div className="bg-white w-full max-w-lg rounded-2xl shadow-2xl overflow-hidden animate-scale-in flex flex-col max-h-[90vh]">
                   <div className="px-6 py-4 border-b border-purple-100 flex justify-between items-center bg-purple-50">
                       <h3 className="font-bold text-purple-900 flex items-center gap-2">
@@ -624,12 +642,54 @@ export const Transactions: React.FC<TransactionsProps> = ({ transactions, setTra
                       <button onClick={() => setShowFundModal(false)}><X className="w-5 h-5 text-purple-400 hover:text-purple-700" /></button>
                   </div>
                   <div className="p-6 overflow-y-auto custom-scrollbar">
-                       {/* Content... */}
                       <p className="text-sm text-slate-500 mb-6">Convert <strong>{fundingTx.description}</strong> to a One-Time Expense.</p>
-                       {/* ... Funding Lists ... */}
                   </div>
                   <div className="p-6 pt-0">
                       <button onClick={executeFunding} className="w-full py-3 rounded-xl font-bold text-white transition-all shadow-lg bg-purple-600 hover:bg-purple-700 shadow-purple-200">Convert & Fund</button>
+                  </div>
+              </div>
+          </div>
+      )}
+
+      {/* API Key Modal */}
+      {showKeyModal && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-sm p-4 animate-fade-in">
+              <div className="bg-white w-full max-w-md rounded-2xl shadow-2xl overflow-hidden animate-scale-in">
+                  <div className="px-6 py-4 border-b border-slate-100 flex justify-between items-center bg-slate-50">
+                      <h3 className="font-bold text-slate-800 flex items-center gap-2">
+                          <Key className="w-5 h-5 text-cyan-600" /> AI Features Setup
+                      </h3>
+                      <button onClick={() => setShowKeyModal(false)}><X className="w-5 h-5 text-slate-400 hover:text-slate-600" /></button>
+                  </div>
+                  <div className="p-6">
+                      <p className="text-sm text-slate-500 mb-4">
+                          To use Auto-Categorization, please enter your free Google Gemini API Key.
+                      </p>
+                      <div className="bg-slate-50 p-3 rounded-lg border border-slate-200 mb-4">
+                           <p className="text-xs text-slate-600">
+                               <strong>Don't have a key?</strong> Get one for free at <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener noreferrer" className="text-cyan-600 font-bold underline">aistudio.google.com</a>.
+                           </p>
+                      </div>
+                      
+                      <div className="mb-6">
+                          <label className="text-[10px] font-bold text-slate-400 uppercase block mb-2">API Key</label>
+                          <input 
+                              type="password" 
+                              value={tempKey} 
+                              onChange={(e) => setTempKey(e.target.value)} 
+                              autoFocus
+                              className="w-full px-4 py-2 border border-slate-200 rounded-lg text-sm outline-none focus:border-cyan-400"
+                              placeholder="AIzaSy..."
+                          />
+                      </div>
+
+                      <button 
+                          onClick={saveApiKey}
+                          disabled={!tempKey}
+                          className={`w-full py-3 rounded-xl font-bold text-white transition-all ${!tempKey ? 'bg-slate-300 cursor-not-allowed' : 'bg-cyan-600 hover:bg-cyan-700 shadow-lg'}`}
+                      >
+                          Save Key
+                      </button>
                   </div>
               </div>
           </div>

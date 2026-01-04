@@ -1,7 +1,20 @@
-import React from 'react';
-import { Wallet, PieChart, CreditCard, LayoutDashboard, Info, Coins, Split, AlertCircle } from 'lucide-react';
+import React, { useState } from 'react';
+import { Wallet, PieChart, CreditCard, LayoutDashboard, Info, Coins, Split, AlertCircle, Key, CheckCircle2 } from 'lucide-react';
 
 export const HowItWorks: React.FC = () => {
+  const [apiKey, setApiKey] = useState(() => localStorage.getItem('gemini_api_key') || '');
+  const [saved, setSaved] = useState(false);
+
+  const saveKey = () => {
+    if (apiKey.trim()) {
+      localStorage.setItem('gemini_api_key', apiKey.trim());
+      setSaved(true);
+      setTimeout(() => setSaved(false), 2000);
+    } else {
+      localStorage.removeItem('gemini_api_key');
+    }
+  };
+
   const FeatureSection = ({ icon: Icon, title, description, children }: any) => (
       <div className="bg-white p-6 rounded-2xl shadow-sm border border-slate-200">
           <div className="flex items-center gap-3 mb-4">
@@ -23,6 +36,43 @@ export const HowItWorks: React.FC = () => {
                 A guide to the zero-based envelope budgeting system.
                 Every unit of money has a job, and every expense is tracked.
             </p>
+        </div>
+
+        {/* AI Configuration Section */}
+        <div className="bg-slate-900 text-white rounded-2xl p-8 overflow-hidden relative">
+            <div className="absolute top-0 right-0 w-64 h-64 bg-cyan-500/10 rounded-full blur-3xl -mr-16 -mt-16 pointer-events-none"></div>
+            
+            <div className="relative z-10 flex flex-col md:flex-row items-center gap-8">
+                <div className="flex-1">
+                    <div className="flex items-center gap-2 mb-2 text-cyan-400 font-bold uppercase tracking-wider text-xs">
+                        <Key className="w-4 h-4" /> Configuration
+                    </div>
+                    <h2 className="text-2xl font-bold mb-4">Enable AI Features</h2>
+                    <p className="text-slate-300 text-sm mb-6 leading-relaxed">
+                        To use Auto-Categorization, you need to provide your own Google Gemini API Key. The key is stored locally on your device and never sent to our servers.
+                    </p>
+                    
+                    <div className="flex flex-col sm:flex-row gap-4 max-w-lg">
+                       <input 
+                         type="password"
+                         value={apiKey}
+                         onChange={(e) => setApiKey(e.target.value)}
+                         placeholder="Enter your API Key (AIza...)"
+                         className="flex-1 px-4 py-3 rounded-xl bg-white/10 border border-white/20 text-white placeholder-slate-500 outline-none focus:border-cyan-400 focus:bg-white/20 transition-all text-sm"
+                       />
+                       <button 
+                         onClick={saveKey}
+                         className={`px-6 py-3 rounded-xl font-bold text-sm transition-colors flex items-center justify-center gap-2 shadow-lg min-w-[120px] ${saved ? 'bg-emerald-500 text-white' : 'bg-white text-slate-900 hover:bg-cyan-50'}`}
+                       >
+                         {saved ? <CheckCircle2 className="w-4 h-4" /> : 'Save Key'}
+                         {saved ? 'Saved' : ''}
+                       </button>
+                    </div>
+                     <p className="text-[10px] text-slate-500 mt-3">
+                        Don't have a key? Get one for free at <a href="https://aistudio.google.com/app/apikey" target="_blank" rel="noopener noreferrer" className="text-cyan-400 hover:text-cyan-300 underline">Google AI Studio</a>.
+                    </p>
+                </div>
+            </div>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">

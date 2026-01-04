@@ -1,15 +1,17 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { Category, Transaction } from "../types";
 
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+// Removed global instance relying on process.env to support user-supplied keys
 const modelId = "gemini-3-flash-preview";
 
 export const categorizeTransaction = async (
+  apiKey: string,
   description: string,
   categories: Category[]
 ): Promise<string | null> => {
-  if (!categories.length) return null;
+  if (!categories.length || !apiKey) return null;
 
+  const ai = new GoogleGenAI({ apiKey });
   const categoryNames = categories.map((c) => c.name).join(", ");
   const prompt = `Match this transaction description: "${description}" to one of these categories: [${categoryNames}]. Return only the exact category name. If no match is likely, return "Uncategorized".`;
 
@@ -43,11 +45,13 @@ export const categorizeTransaction = async (
 };
 
 export const categorizeTransactionsBatch = async (
+  apiKey: string,
   descriptions: string[],
   categories: Category[]
 ): Promise<Record<string, string>> => {
-  if (!categories.length || !descriptions.length) return {};
+  if (!categories.length || !descriptions.length || !apiKey) return {};
 
+  const ai = new GoogleGenAI({ apiKey });
   const categoryNames = categories.map((c) => c.name).join(", ");
   const prompt = `
     You are a transaction classifier.
@@ -104,8 +108,13 @@ export const categorizeTransactionsBatch = async (
 };
 
 export const getFinancialAdvice = async (
+  apiKey: string,
   state: { income: number; expenses: number; categories: Category[]; transactions: Transaction[] }
 ): Promise<string> => {
+  if (!apiKey) return "API Key missing.";
+  
+  const ai = new GoogleGenAI({ apiKey });
+
   try {
     const summary = `
       Income Estimate: ${state.income}
