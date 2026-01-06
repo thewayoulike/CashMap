@@ -6,7 +6,7 @@ import { BudgetManager } from './components/BudgetManager';
 import { Transactions } from './components/Transactions';
 import { LoginPage } from './components/LoginPage';
 import { HowItWorks } from './components/HowItWorks';
-import { Category, Transaction, IncomeSource, UserProfile, SyncStatus, FullBackupData } from './types';
+import { Category, Transaction, IncomeSource, UserProfile, SyncStatus, FullBackupData, Account } from './types';
 import { findFile, createFile, updateFile, downloadFile } from './services/driveService';
 import { v4 as uuidv4 } from 'uuid';
 
@@ -39,14 +39,35 @@ const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState('dashboard');
   const [dataLoaded, setDataLoaded] = useState(false);
 
-  // --- App Data State (Initially Empty) ---
+  // --- App Data State ---
   const [categories, setCategories] = useState<Category[]>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [incomeSources, setIncomeSources] = useState<IncomeSource[]>([]);
+  const [accounts, setAccounts] = useState<Account[]>([]);
 
   // --- Defaults ---
-  // User requested to remove initial default categories
-  const defaultCategories: Category[] = [];
+  const defaultCategories: Category[] = [
+    {
+      id: 'cat_default_other',
+      name: 'Other Expenses (One Time)',
+      type: 'expense',
+      monthlyBudget: 0,
+      rollover: 0,
+      allocationRule: 0,
+      color: '#64748b', // Slate-500
+      startDate: new Date().toISOString().split('T')[0]
+    },
+    {
+      id: 'cat_default_transfer',
+      name: 'Transfers',
+      type: 'expense',
+      monthlyBudget: 0,
+      rollover: 0,
+      allocationRule: 0,
+      color: '#94a3b8', // Slate-400
+      startDate: new Date().toISOString().split('T')[0]
+    }
+  ];
 
   const defaultIncome: IncomeSource[] = [{
       id: uuidv4(),
@@ -60,6 +81,10 @@ const App: React.FC = () => {
       ]
   }];
 
+  const defaultAccounts: Account[] = [
+      { id: uuidv4(), name: 'Checking Account', type: 'checking', initialBalance: 0, currency: 'USD' }
+  ];
+
   // --- Initialization: Load Google Scripts ---
   useEffect(() => {
     if (window.google) return; 
@@ -72,13 +97,16 @@ const App: React.FC = () => {
         const c = localStorage.getItem('fs_categories');
         const t = localStorage.getItem('fs_transactions');
         const i = localStorage.getItem('fs_income_sources');
+        const a = localStorage.getItem('fs_accounts');
         
         setCategories(c ? JSON.parse(c) : defaultCategories);
         setTransactions(t ? JSON.parse(t) : []);
         setIncomeSources(i ? JSON.parse(i) : defaultIncome);
+        setAccounts(a ? JSON.parse(a) : defaultAccounts);
     } catch (e) {
         console.error("Local Load Error", e);
         setCategories(defaultCategories);
+        setAccounts(defaultAccounts);
     }
     setSyncStatus('local');
     setDataLoaded(true);
@@ -95,11 +123,13 @@ const App: React.FC = () => {
             setCategories(data.categories || defaultCategories);
             setTransactions(data.transactions || []);
             setIncomeSources(data.incomeSources || defaultIncome);
+            setAccounts(data.accounts || defaultAccounts);
         } else {
             // New File needed, but we don't create it until first save
             setCategories(defaultCategories);
             setTransactions([]);
             setIncomeSources(defaultIncome);
+            setAccounts(defaultAccounts);
         }
         setSyncStatus('synced');
         setDataLoaded(true);
@@ -165,6 +195,7 @@ const App: React.FC = () => {
       setCategories([]);
       setTransactions([]);
       setIncomeSources([]);
+      setAccounts([]);
       setDataLoaded(false);
       setDriveFileId(null);
       
@@ -186,6 +217,7 @@ const App: React.FC = () => {
             localStorage.setItem('fs_categories', JSON.stringify(categories));
             localStorage.setItem('fs_transactions', JSON.stringify(transactions));
             localStorage.setItem('fs_income_sources', JSON.stringify(incomeSources));
+            localStorage.setItem('fs_accounts', JSON.stringify(accounts));
             return;
         }
 
@@ -196,6 +228,7 @@ const App: React.FC = () => {
                 categories,
                 transactions,
                 incomeSources,
+                accounts,
                 lastUpdated: new Date().toISOString()
             };
 
@@ -227,7 +260,7 @@ const App: React.FC = () => {
     return () => {
         if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
     };
-  }, [categories, transactions, incomeSources, dataLoaded, user, token, driveFileId]);
+  }, [categories, transactions, incomeSources, accounts, dataLoaded, user, token, driveFileId]);
 
 
   // --- Render ---
@@ -246,14 +279,26 @@ const App: React.FC = () => {
           setCategories={setCategories}
           transactions={transactions} 
           setTransactions={setTransactions}
-          incomeSources={incomeSources} 
+          incomeSources={incomeSources}
+          accounts={accounts}
         />;
       case 'income':
-        return <IncomeConfig incomeSources={incomeSources} onUpdate={setIncomeSources} />;
+        return <IncomeConfig 
+            incomeSources={incomeSources} 
+            onUpdate={setIncomeSources} 
+            accounts={accounts}
+            setAccounts={setAccounts}
+        />;
       case 'budget':
         return <BudgetManager categories={categories} setCategories={setCategories} currency={displayCurrency} transactions={transactions} incomeSources={incomeSources} />;
       case 'transactions':
-        return <Transactions transactions={transactions} setTransactions={setTransactions} categories={categories} currency={displayCurrency} />;
+        return <Transactions 
+            transactions={transactions} 
+            setTransactions={setTransactions} 
+            categories={categories} 
+            currency={displayCurrency} 
+            accounts={accounts}
+        />;
       case 'help':
         return <HowItWorks />;
       default:
@@ -263,6 +308,7 @@ const App: React.FC = () => {
           transactions={transactions} 
           setTransactions={setTransactions}
           incomeSources={incomeSources} 
+          accounts={accounts}
         />;
     }
   };

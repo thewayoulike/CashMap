@@ -1,14 +1,16 @@
 import React, { useEffect, useState } from 'react';
-import { IncomeSource, AllocationRule, PaymentFrequency } from '../types';
-import { Settings, Plus, Trash2, Save, CheckCircle2, Landmark, Calculator, CalendarDays, StickyNote, HelpCircle, AlertCircle, ToggleLeft, ToggleRight } from 'lucide-react';
+import { IncomeSource, AllocationRule, PaymentFrequency, Account, AccountType } from '../types';
+import { Settings, Plus, Trash2, Save, CheckCircle2, Landmark, Calculator, CalendarDays, StickyNote, HelpCircle, AlertCircle, ToggleLeft, ToggleRight, CreditCard, Wallet, PiggyBank, Briefcase } from 'lucide-react';
 import { v4 as uuidv4 } from 'uuid';
 
 interface IncomeConfigProps {
   incomeSources: IncomeSource[];
   onUpdate: (sources: IncomeSource[]) => void;
+  accounts: Account[];
+  setAccounts: React.Dispatch<React.SetStateAction<Account[]>>;
 }
 
-export const IncomeConfig: React.FC<IncomeConfigProps> = ({ incomeSources, onUpdate }) => {
+export const IncomeConfig: React.FC<IncomeConfigProps> = ({ incomeSources, onUpdate, accounts, setAccounts }) => {
   const [isSaved, setIsSaved] = useState(false);
   const [activeNoteIndex, setActiveNoteIndex] = useState<number | null>(null);
 
@@ -40,7 +42,25 @@ export const IncomeConfig: React.FC<IncomeConfigProps> = ({ incomeSources, onUpd
     setTimeout(() => setIsSaved(false), 3000);
   };
 
-  // Helper to redistribute 100% evenly
+  // --- Account Management Helpers ---
+  const addAccount = () => {
+    setAccounts([
+        ...accounts, 
+        { id: uuidv4(), name: 'New Account', type: 'checking', initialBalance: 0, currency: source.currency }
+    ]);
+  };
+
+  const updateAccount = (id: string, field: keyof Account, value: any) => {
+      setAccounts(accounts.map(acc => acc.id === id ? { ...acc, [field]: value } : acc));
+  };
+
+  const removeAccount = (id: string) => {
+      if(confirm('Are you sure you want to remove this account? Existing transactions linked to it will remain but may lose their reference.')) {
+          setAccounts(accounts.filter(a => a.id !== id));
+      }
+  };
+
+  // --- Allocation Helpers ---
   const getEvenAllocations = (currentAllocations: AllocationRule[]): AllocationRule[] => {
     const count = currentAllocations.length;
     if (count === 0) return [];
@@ -55,7 +75,6 @@ export const IncomeConfig: React.FC<IncomeConfigProps> = ({ incomeSources, onUpd
     return newAllocations;
   };
 
-  // Re-calculate allocation amounts based on their current percentages and a new Total
   const recalculateAmountsFromTotal = (total: number, allocations: AllocationRule[]) => {
       return allocations.map(a => ({
           ...a,
@@ -73,7 +92,6 @@ export const IncomeConfig: React.FC<IncomeConfigProps> = ({ incomeSources, onUpd
   };
 
   const updateFrequency = (newFreq: PaymentFrequency) => {
-     // Estimate number of paychecks based on frequency
      let count = 1;
      if (newFreq === 'semi-monthly') count = 2;
      if (newFreq === 'weekly') count = 4;
@@ -105,7 +123,6 @@ export const IncomeConfig: React.FC<IncomeConfigProps> = ({ incomeSources, onUpd
 
   const addPayment = () => {
     const newPaymentIndex = source.allocations.length + 1;
-    // New payment starts with 0 amount
     const newAllocations = [...source.allocations, { 
         paymentIndex: newPaymentIndex, 
         percentage: 0, 
@@ -114,11 +131,8 @@ export const IncomeConfig: React.FC<IncomeConfigProps> = ({ incomeSources, onUpd
         isUncertain: false
     }];
     
-    // Balance percentages automatically
     const balanced = getEvenAllocations(newAllocations);
-    // Recalculate amounts based on total
     const amountAdjusted = recalculateAmountsFromTotal(source.estimatedAmount, balanced);
-    
     updateSource({ ...source, allocations: amountAdjusted });
   };
 
@@ -126,24 +140,17 @@ export const IncomeConfig: React.FC<IncomeConfigProps> = ({ incomeSources, onUpd
     if (source.allocations.length <= 1) return;
 
     let newAllocations = source.allocations.filter((_, i) => i !== indexToRemove);
-    // Re-index
     newAllocations = newAllocations.map((a, i) => ({...a, paymentIndex: i + 1}));
-    // Re-balance
     newAllocations = getEvenAllocations(newAllocations);
-    // Recalculate amounts
     const amountAdjusted = recalculateAmountsFromTotal(source.estimatedAmount, newAllocations);
 
-    updateSource({ 
-        ...source, 
-        allocations: amountAdjusted
-    });
+    updateSource({ ...source, allocations: amountAdjusted });
   };
 
   const updateAmount = (allocIndex: number, newAmount: number) => {
     const newAllocations = source.allocations.map(a => 
         a.paymentIndex === allocIndex ? { ...a, amount: newAmount } : a
     );
-    // When manually updating a single amount, we update the total sum
     const newTotal = newAllocations.reduce((sum, a) => sum + a.amount, 0);
     updateSource({ 
         ...source, 
@@ -184,8 +191,6 @@ export const IncomeConfig: React.FC<IncomeConfigProps> = ({ incomeSources, onUpd
     if (currentAllocations.length === 1) return; 
 
     changedAlloc.percentage = newValue;
-
-    // Auto-balance logic
     const targetRemainder = 100 - newValue;
     const others = currentAllocations.filter(a => a.paymentIndex !== allocIndex);
     const currentOthersSum = others.reduce((sum, a) => sum + a.percentage, 0);
@@ -210,17 +215,12 @@ export const IncomeConfig: React.FC<IncomeConfigProps> = ({ incomeSources, onUpd
         });
     }
 
-    // After percentages settle, recalculate amounts based on total
     const finalAllocations = recalculateAmountsFromTotal(source.estimatedAmount, currentAllocations);
     updateSource({ ...source, allocations: finalAllocations });
   };
 
   const updateCurrency = (newCurrency: string) => {
     updateSource({ ...source, currency: newCurrency });
-  };
-  
-  const updateOpeningBalance = (val: number) => {
-      updateSource({ ...source, openingBalance: val });
   };
 
   const currencies = [
@@ -241,45 +241,105 @@ export const IncomeConfig: React.FC<IncomeConfigProps> = ({ incomeSources, onUpd
       <div className="flex justify-between items-center mb-2">
          <h2 className="text-xl font-bold text-gray-800 flex items-center">
             <Settings className="w-6 h-6 mr-2 text-cyan-600" />
-            Income Configuration
+            Income & Accounts Setup
          </h2>
       </div>
-      
-      <p className="text-sm text-gray-500 mb-4">
-          Add your income sources below. If a payment amount is unknown, mark it as an <strong>Estimate</strong>.
-      </p>
 
-      {/* Opening Balance / Equity Card */}
+      {/* Account Manager Card */}
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden mb-6">
-          <div className="px-6 py-4 border-b border-gray-100 bg-gray-50/50 flex items-center gap-2">
-              <Landmark className="w-4 h-4 text-emerald-600" />
-              <div className="text-sm font-bold text-gray-600 uppercase tracking-wide">Opening Balance / Equity</div>
-          </div>
-          <div className="p-6 flex flex-col sm:flex-row gap-4 items-center">
-              <div className="flex-1">
-                  <p className="text-sm text-gray-500">
-                      Starting cash available before any tracked income. Use this for existing savings or checking account buffers that you want to allocate.
-                  </p>
+          <div className="px-6 py-4 border-b border-gray-100 bg-gray-50/50 flex justify-between items-center">
+              <div className="flex items-center gap-2">
+                  <Landmark className="w-4 h-4 text-emerald-600" />
+                  <div className="text-sm font-bold text-gray-600 uppercase tracking-wide">Bank Accounts & Initial Equity</div>
               </div>
-              <div className="w-full sm:w-48">
-                  <label className="block text-[10px] text-gray-400 font-bold uppercase mb-1">Initial Amount</label>
-                  <div className="relative">
-                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm font-medium">
-                        {currentSymbol}
-                    </span>
-                    <input
-                        type="number"
-                        value={source.openingBalance || ''}
-                        onChange={(e) => updateOpeningBalance(parseFloat(e.target.value) || 0)}
-                        className="w-full pl-8 pr-4 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm font-bold text-emerald-700 focus:bg-white focus:ring-2 focus:ring-emerald-100 focus:border-emerald-400 outline-none transition-all"
-                        placeholder="0.00"
-                    />
-                  </div>
+              <button 
+                onClick={addAccount}
+                className="text-[10px] bg-emerald-50 text-emerald-600 border border-emerald-200 hover:bg-emerald-100 font-bold px-3 py-1.5 rounded-lg flex items-center gap-1 transition-colors"
+              >
+                  <Plus className="w-3 h-3" /> Add Account
+              </button>
+          </div>
+          
+          <div className="p-6">
+              <p className="text-sm text-gray-500 mb-4">
+                  Define your accounts (Checking, Savings, Cash) and their starting balance before tracking new income.
+              </p>
+              
+              <div className="space-y-3">
+                  {accounts.map((acc) => (
+                      <div key={acc.id} className="flex flex-col sm:flex-row gap-3 items-center p-3 border border-gray-100 rounded-xl hover:border-emerald-200 transition-colors bg-gray-50/30">
+                          
+                          {/* Icon Selector */}
+                          <div className="p-2 bg-emerald-100 rounded-lg text-emerald-600 flex-shrink-0">
+                               {acc.type === 'checking' && <CreditCard className="w-4 h-4" />}
+                               {acc.type === 'savings' && <PiggyBank className="w-4 h-4" />}
+                               {acc.type === 'cash' && <Wallet className="w-4 h-4" />}
+                               {acc.type === 'investment' && <Briefcase className="w-4 h-4" />}
+                               {acc.type === 'credit' && <CreditCard className="w-4 h-4" />}
+                          </div>
+
+                          <div className="flex-1 w-full grid grid-cols-1 sm:grid-cols-12 gap-3">
+                              {/* Name */}
+                              <div className="sm:col-span-4">
+                                  <label className="block sm:hidden text-[10px] font-bold text-gray-400 uppercase mb-1">Account Name</label>
+                                  <input 
+                                      type="text" 
+                                      value={acc.name} 
+                                      onChange={(e) => updateAccount(acc.id, 'name', e.target.value)}
+                                      className="w-full px-3 py-2 text-sm border border-gray-200 rounded-lg outline-none focus:border-emerald-400"
+                                      placeholder="Account Name"
+                                  />
+                              </div>
+                              
+                              {/* Type */}
+                              <div className="sm:col-span-3">
+                                  <label className="block sm:hidden text-[10px] font-bold text-gray-400 uppercase mb-1">Type</label>
+                                  <select 
+                                      value={acc.type}
+                                      onChange={(e) => updateAccount(acc.id, 'type', e.target.value)}
+                                      className="w-full px-2 py-2 text-sm border border-gray-200 rounded-lg outline-none focus:border-emerald-400 bg-white"
+                                  >
+                                      <option value="checking">Checking</option>
+                                      <option value="savings">Savings</option>
+                                      <option value="credit">Credit Card</option>
+                                      <option value="cash">Cash / Wallet</option>
+                                      <option value="investment">Investment</option>
+                                  </select>
+                              </div>
+
+                              {/* Initial Balance */}
+                              <div className="sm:col-span-4 relative">
+                                  <label className="block sm:hidden text-[10px] font-bold text-gray-400 uppercase mb-1">Initial Balance</label>
+                                  <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-xs sm:top-1/2 sm:mt-0">{currentSymbol}</span>
+                                  <input 
+                                      type="number" 
+                                      value={acc.initialBalance}
+                                      onChange={(e) => updateAccount(acc.id, 'initialBalance', parseFloat(e.target.value) || 0)}
+                                      className="w-full pl-7 pr-3 py-2 text-sm font-bold text-gray-700 border border-gray-200 rounded-lg outline-none focus:border-emerald-400"
+                                      placeholder="0.00"
+                                  />
+                              </div>
+                              
+                              {/* Delete */}
+                              <div className="sm:col-span-1 flex justify-end">
+                                  <button onClick={() => removeAccount(acc.id)} className="p-2 text-gray-300 hover:text-red-500 transition-colors">
+                                      <Trash2 className="w-4 h-4" />
+                                  </button>
+                              </div>
+                          </div>
+                      </div>
+                  ))}
+
+                  {accounts.length === 0 && (
+                      <div className="text-center py-6 text-sm text-gray-400 border-2 border-dashed border-gray-100 rounded-xl">
+                          No accounts added yet. Add an account to track where your money lives.
+                      </div>
+                  )}
               </div>
           </div>
       </div>
 
-      {/* Main Container Box */}
+      {/* Main Income Config Box */}
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
         
         {/* Header with Currency & Frequency */}

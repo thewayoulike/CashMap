@@ -33,9 +33,22 @@ export const BudgetManager: React.FC<BudgetManagerProps> = ({ categories, setCat
     }
   }, [currency]);
 
-  // Filter categories based on active tab
+  // Filter categories based on active tab and hide "hardcore" default categories
   const displayedCategories = useMemo(() => {
-      return categories.filter(c => (c.type || 'expense') === activeTab);
+      return categories.filter(c => {
+          // Check for correct tab type
+          if ((c.type || 'expense') !== activeTab) return false;
+
+          // Hide Hardcoded/System Categories
+          const isHardcoded = 
+            c.id === 'cat_default_other' || 
+            c.id === 'cat_default_transfer' ||
+            c.name.toLowerCase() === 'other expenses (one time)' || 
+            c.name.toLowerCase() === 'transfers' ||
+            c.name.toLowerCase() === 'other expenses';
+            
+          return !isHardcoded;
+      });
   }, [categories, activeTab]);
 
   const getCurrentMonthlyBudget = (cat: Category) => {
@@ -227,7 +240,11 @@ export const BudgetManager: React.FC<BudgetManagerProps> = ({ categories, setCat
         {/* List */}
         <div className="space-y-4">
           {displayedCategories.length === 0 && (
-            <p className="text-center text-gray-400 py-8">No {activeTab} categories defined yet.</p>
+            <p className="text-center text-gray-400 py-8">
+                {activeTab === 'expense' 
+                    ? 'No editable expense categories. (System categories are hidden)' 
+                    : `No ${activeTab} categories defined yet.`}
+            </p>
           )}
 
           {/* Desktop Headers */}

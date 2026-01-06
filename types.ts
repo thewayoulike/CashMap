@@ -1,7 +1,8 @@
 
 export enum TransactionType {
   INCOME = 'INCOME',
-  EXPENSE = 'EXPENSE'
+  EXPENSE = 'EXPENSE',
+  TRANSFER = 'TRANSFER'
 }
 
 export interface ScheduledBudgetChange {
@@ -25,14 +26,29 @@ export interface Category {
   linkedPaymentIndex?: number; // 1-based index. If set, this category is ONLY funded by this payment (at 100%).
 }
 
+export type AccountType = 'checking' | 'savings' | 'credit' | 'cash' | 'investment';
+
+export interface Account {
+  id: string;
+  name: string;
+  type: AccountType;
+  initialBalance: number;
+  currency: string;
+}
+
 export interface Transaction {
   id: string;
   date: string;
   amount: number;
   description: string;
   categoryId?: string; 
+  accountId?: string; // Links transaction to a specific bank account
   type: TransactionType;
   parentTransactionId?: string; // Links allocation transactions back to the income source
+  
+  // Transfer Logic
+  transferDirection?: 'in' | 'out';
+  transferPeerId?: string; // ID of the matching transaction in the other account
 }
 
 export type PaymentFrequency = 'monthly' | 'semi-monthly' | 'weekly';
@@ -53,7 +69,7 @@ export interface IncomeSource {
   estimatedAmount: number;
   frequency: PaymentFrequency;
   allocations: AllocationRule[];
-  openingBalance?: number; // Added field for initial equity/cash
+  openingBalance?: number; // Deprecated in favor of Account.initialBalance, kept for migration
 }
 
 export interface AppState {
@@ -75,5 +91,6 @@ export interface FullBackupData {
     categories: Category[];
     transactions: Transaction[];
     incomeSources: IncomeSource[];
+    accounts: Account[];
     lastUpdated: string;
 }
