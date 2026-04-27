@@ -85,7 +85,7 @@ const App: React.FC = () => {
       { id: uuidv4(), name: 'Checking Account', type: 'checking', initialBalance: 0, currency: 'USD' }
   ];
 
-  // --- Initialization: Load Google Scripts ---
+  // --- Initialization: AFTAB Load Google Scripts ---
   useEffect(() => {
     if (window.google) return; 
     // Scripts are in index.html, but we wait for them to be ready in handleLogin
